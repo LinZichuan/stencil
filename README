@@ -1,0 +1,7 @@
+#Baseline
+g++ baseline.cpp -o baseline
+./baseline
+
+#GPU version
+./run.sh stencilparallel.cu
+
