@@ -1,7 +1,7 @@
 default:stencil
 
 stencil:
-	nvcc stencilparallel.cu
+	nvcc -O2 stencilparallel.cu
 
 clean:
 	rm -rf ./a.out

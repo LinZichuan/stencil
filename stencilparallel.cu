@@ -8,7 +8,7 @@ using namespace std;
 #define REAL double
 
 #define BX 128
-#define BY 2
+#define BY 8
 #define BZ 1
 #define GZ 1
 
@@ -57,9 +57,11 @@ void check(REAL *a, REAL *b, int nx, int ny, int nz) {
         for (int y = 1; y < ny-1; ++y) {
             for (int x = 1; x < nz-1; ++x) {
                 int idx = z * slice + y * nx + x;
+                //cout << a[idx] << " " << b[idx] << endl;
                 if (abs(a[idx]-b[idx]) > 1e-5) {
-                    cout << a[idx] << " " << b[idx] << endl;
-                    printf("%d\n", idx);
+                    //cout << a[idx] << " " << b[idx] << endl;
+                    cout << x << "," << y << "," << z << endl;
+                    //printf("%d\n", idx);
                     printf("Wrong!!!!!!!!\n");
                     return;
                 }
@@ -80,22 +82,24 @@ __global__ void baseline(REAL* A, REAL* B, int nx, int ny, int nz)
 	//int k = kb > 0? kb: 1;
 	int ke = (kb+nz/gridDim.z<nz)? kb+nz/gridDim.z : nz;
 	int c = i + j*nx + k*slice;
-//#pragma unroll
-	for (; k < ke; k++){
-        int w = (i==0)?c:c-1;
-        int e = (i==nx-1)?c:c+1;
-        int n = (j==0)?c:c-nx;
-        int s = (j==ny-1)?c:c+nx;
-        int b = (k==0)?c:c-slice;
-        int t = (k==nz-1)?c:c+slice;
-        B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
-            +ct*A[t] + cb*A[b] + cc*A[c];
-        c += slice;
-		//if (k > 0 && k < nz-1 && i > 0 && i < nx-1 && j > 0 && j < ny-1){
-		//	B[idx] = ce*A[idx+1] + cw*A[idx-1] + cs*A[idx+nx] + cn*A[idx-nx]
-		//			+ct*A[idx+slice] + cb*A[idx-slice] + cc*A[idx];
-		//	idx += slice;
-	}
+    if (i >= 0 && i < nx && j >= 0 && j < ny) {
+    //#pragma unroll
+        for (; k < ke; k++){
+            int w = (i==0)?c:c-1;
+            int e = (i==nx-1)?c:c+1;
+            int n = (j==0)?c:c-nx;
+            int s = (j==ny-1)?c:c+nx;
+            int b = (k==0)?c:c-slice;
+            int t = (k==nz-1)?c:c+slice;
+            B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
+                +ct*A[t] + cb*A[b] + cc*A[c];
+            c += slice;
+            //if (k > 0 && k < nz-1 && i > 0 && i < nx-1 && j > 0 && j < ny-1){
+            //	B[idx] = ce*A[idx+1] + cw*A[idx-1] + cs*A[idx+nx] + cn*A[idx-nx]
+            //			+ct*A[idx+slice] + cb*A[idx-slice] + cc*A[idx];
+            //	idx += slice;
+        }
+    }
 }
 
 __global__ void baseopt(REAL* A, REAL* B, int nx, int ny, int nz)
@@ -118,23 +122,25 @@ __global__ void baseopt(REAL* A, REAL* B, int nx, int ny, int nz)
     double b_b = A[b];
     double b_c = A[c];
     double b_t;
+    if (i >= 0 && i < nx && j >= 0 && j < ny) {
 #pragma unroll
-    for (; k < ke; k++){
-        t = (k==nz-1)?c:c+slice;
-        b_t = A[t];
-        B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
-            +ct*b_t + cb*b_b + cc*b_c;
-        b_b = b_c;
-        b_c = b_t;
-        c += slice;
-        //b_t = B[idx+slice];
-        ////A[idx] = ce*B[idx+1] + cw*B[idx-1] + cs*B[idx+nx] + cn*B[idx-nx]
-        ////		+ct*B[idx+slice] + cb*B[idx-slice] + cc*B[idx];
-        //A[idx] = ce*B[idx+1] + cw*B[idx-1] + cs*B[idx+nx] + cn*B[idx-nx]
-        //		+ct*b_t + cb*b_b + cc*b_c;
-        //b_b = b_c;
-        //b_c = b_t;
-        //idx += slice;
+        for (; k < ke; k++){
+            t = (k==nz-1)?c:c+slice;
+            b_t = A[t];
+            B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
+                +ct*b_t + cb*b_b + cc*b_c;
+            b_b = b_c;
+            b_c = b_t;
+            c += slice;
+            //b_t = B[idx+slice];
+            ////A[idx] = ce*B[idx+1] + cw*B[idx-1] + cs*B[idx+nx] + cn*B[idx-nx]
+            ////		+ct*B[idx+slice] + cb*B[idx-slice] + cc*B[idx];
+            //A[idx] = ce*B[idx+1] + cw*B[idx-1] + cs*B[idx+nx] + cn*B[idx-nx]
+            //		+ct*b_t + cb*b_b + cc*b_c;
+            //b_b = b_c;
+            //b_c = b_t;
+            //idx += slice;
+        }
     }
 	return;
 }
@@ -159,15 +165,17 @@ __global__ void roc(const REAL* __restrict__ A, REAL* B, int nx, int ny, int nz)
     double b_b = A[b];
     double b_c = A[c];
     double b_t;
+    if (i >= 0 && i < nx && j >= 0 && j < ny) {
 #pragma unroll
-    for (; k < ke; k++){
-        t = (k==nz-1)?c:c+slice;
-        b_t = A[t];
-        B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
-            +ct*b_t + cb*b_b + cc*b_c;
-        b_b = b_c;
-        b_c = b_t;
-        c += slice;
+        for (; k < ke; k++){
+            t = (k==nz-1)?c:c+slice;
+            b_t = A[t];
+            B[c] = ce*A[e] + cw*A[w] + cs*A[s] + cn*A[n]
+                +ct*b_t + cb*b_b + cc*b_c;
+            b_b = b_c;
+            b_c = b_t;
+            c += slice;
+        }
     }
 	return;
 }
@@ -227,7 +235,7 @@ int main(int argc, char **argv){
                 //cout << k*NY*NX + j*NX + i << endl;
 				cpu_A[k*NY*NX+j*NX+i] = 1.0;	
 				cpu_B[k*NY*NX+j*NX+i] = 1.0;
-				result_A[k*NY*NX+j*NX+i] = 1.0;
+				result_A[k*NY*NX+j*NX+i] = 0.0;
             }
 
     cudaEvent_t start, stop;
@@ -268,7 +276,8 @@ int main(int argc, char **argv){
         ///////////////////////////////////////////////////////////////
         //baseline
         for (int t = 0; t < T; t++){
-            baseline<<<blockPerGrid, threadPerBlock>>>(dev_A, dev_B, NX, NY, NZ_);
+            //baseline<<<blockPerGrid, threadPerBlock>>>(dev_A, dev_B, NX, NY, NZ_);
+            roc<<<blockPerGrid, threadPerBlock>>>(dev_A, dev_B, NX, NY, NZ_);
             REAL* tmp = dev_A;
             dev_A = dev_B;
             dev_B = tmp;
@@ -285,7 +294,8 @@ int main(int argc, char **argv){
     cudaEventRecord(stop, 0);
     cudaEventSynchronize(stop);
     cudaEventElapsedTime(&elapsed_time, start, stop);
-
+    
+    /*
     struct timeval t1, t2;
     gettimeofday(&t1, NULL);
     stencil(cpu_A, cpu_B, NX, NY, NZ, T);
@@ -310,10 +320,10 @@ int main(int argc, char **argv){
             index += partsize+2*NX*NY;
         }
         check(cpu_A, result_A, NX, NY, NZ);
-    }
+    }*/
     //printf("baseline: Gflops = %lf\n", flops);
 
-    printf("baseline: elapsed time = %f ms\n", elapsed_time/T);
+    printf("baseline: elapsed time = %f ms\n", elapsed_time);
     flops = 1.0*13*(NX-2)*(NY-2)*(NZ-2)*T/1.e+6;
     flops /= elapsed_time;
 
