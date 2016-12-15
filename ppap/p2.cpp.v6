@@ -331,7 +331,7 @@ void preprocess(int *Ai, int *Aj, double *value, int *diagpos, double *R, double
     double *y = new double[size];
     for (int i = 0; i < size; ++i) {
         int begin = Ai[i];
-        int end = diagpos[i]; //Ai[i+1];
+        int end = Ai[i+1];
         double tmp = 0.0;
         for (int j = begin; j < end; ++j) {
             tmp += value[j] * y[Aj[j]];
@@ -341,7 +341,7 @@ void preprocess(int *Ai, int *Aj, double *value, int *diagpos, double *R, double
     }
     //UR_ = y
     for (int i = size-1; i >= 0; --i) {
-        int begin = diagpos[i]+1; //Ai[i];
+        int begin = Ai[i];
         int end = Ai[i+1];
         double tmp = 0.0;
         for (int j = begin; j < end; ++j) {
@@ -433,19 +433,13 @@ int main() {
         //cout << begin << "," << end << " " << jbegin << "," << jend << endl;
         //cout << begin << " " << diagpos[i] << endl;
         for (int j = begin; j < diagpos[i]; ++j) {
-            int jj = diagpos[Aj[j]];
-            value[j] /= value[jj];
+            value[j] /= value[diagpos[Aj[j]]];
             //cout << value[j] << endl;
-            int jbegin = j+1;
-            int jend = end;
-            int kbegin = jj+1;
-            int kend = Ai[Aj[j]+1];
-            //int kbegin = Ai[Aj[j+1]];
-            //int kend = Ai[Aj[j]+1];
-            //int idxj=begin, idxk=jbegin;
-            int idxj=jbegin, idxk=kbegin;
+            int jbegin = Ai[Aj[j]];
+            int jend = Ai[Aj[j]+1];
+            int idxj=begin, idxk=jbegin;
             //cout << begin << "," << end << " " << jbegin << "," << jend << endl;
-            while (idxj < jend && idxk < kend) {
+            while (idxj < end && idxk < jend) {
                 //if (Aj[idxj] < i) {
                 //    value[idxj] = value[idxj] / value[diagpos[Aj[idxj]]]; //TODO: sort, save diagpos for diag element in getiluA
                 //}
@@ -455,7 +449,7 @@ int main() {
                     //    cout << "aaaaaaaaaaa" << endl;
                     //}
                     //cout << value[j] << endl;
-                    value[idxj] -= (value[j] * value[idxk]); //Aik = Aik - Aij * Ajk;
+                    value[idxj] -= value[j] * value[idxk]; //Aik = Aik - Aij * Ajk;
                     idxj++;
                     idxk++;
                 }
@@ -489,7 +483,7 @@ int main() {
     vecAp.push_back(Ap0);
     int k = 5;
     double vecAp_2[150];
-    for (int i = 1; i < 21; ++i) {
+    for (int i = 1; i < 35; ++i) {
         vecAp_2[i-1] = dotproduct(vecAp[i-1], vecAp[i-1], size);
         double alpha = dotproduct(R, vecAp[i-1], size) / vecAp_2[i-1];
         cout << i << endl;
