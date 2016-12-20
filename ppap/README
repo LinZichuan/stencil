@@ -1,8 +1,0 @@
-#run
-./run.sh
-
-#serial version
-p2_clean.cpp
-
-#mpi version
-p2_mpi_final.cpp
