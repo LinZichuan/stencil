@@ -6,12 +6,12 @@
 #include <cstdlib>
 #include <algorithm>
 #include <mpi.h>
-#include <sstream>
 using namespace std;
 
-void Aproduct(double *A, double *x,double *Ax, int nx, int ny, int nz) {
+double* Aproduct(double *A, double *x, int nx, int ny, int nz) {
     int size = nx * ny * nz;
     int slice = ny * nz;
+    double *Ax = new double[size];
 #define IDXA(i,j,k,n) (i)*ny*nz*19+(j)*nz*19+(k)*19+(n)
 #define IDXx(i,j,k  ) (i+1)*(ny+2)*(nz+2)+(j+1)*(nz+2)+(k+1)
 #define IDXAx(i,j,k ) (i)*ny*nz + (j)*nz + (k)
@@ -41,6 +41,7 @@ void Aproduct(double *A, double *x,double *Ax, int nx, int ny, int nz) {
             }
         }
     }
+    return Ax;
 }
 bool judge(const pair<int,int> a, const pair<int,int> b) {
     return a.first < b.first;
@@ -52,7 +53,7 @@ int getcsrA(double *A, int *Ai, int *Aj, double *value, int* diagpos, int nx, in
     vector<int> a(19); //only a is global
     int nxslice = (nx-1)*slice;
 #define IN(i,j,k)  (((i+NX)%NX>=xs && (i+NX)%NX<xe && (j)>=ys && (j)<ye) ? 1:0)
-#define xIDX(i,j,k) (IN(i,j,k)?(((i+NX)%NX-xs)*(ny)*(nz) + (j-ys)*(nz) + (k)):-1) //local
+#define xIDX(i1,j1,k1) ( IN(i1,j1,k1) ? (((i1+NX)%NX-xs)*(ny)*(nz) + (j1-ys)*(nz) + (k1)) : -1 ) //local
     for (int ii = 0; ii < nx; ++ii) {
         for (int jj = 0; jj < ny; ++jj) {
             for (int kk = 0; kk < nz; ++kk) {
@@ -146,16 +147,23 @@ int getcsrA(double *A, int *Ai, int *Aj, double *value, int* diagpos, int nx, in
                 vector< pair<int,int> > b(19);
                 for (int t = 0; t < 19; ++t) {
                     b[t] = make_pair<int,int>(a[t], t);
+                    //cout << A[idx+t] << endl;
                 }
                 sort(b.begin(), b.end(), judge);
+                //sort(a.begin(), a.end());
                 int nonzero_num = 0;
                 for (int t = 0; t < 19; ++t) {
                     if (b[t].first == -1) continue;
+                    //int xx = b[t].first / slice;
+                    //int yy = (b[t].first % slice) / nz;
+                    //if ((i+NX)%NX < xs || (i+NX)%NX >= xe || j < ys || j >= ye) continue;
+                    //if (xx < xs || xx >= xe || yy < ys || yy >= ye) continue; //TODO
                     value[nonzero] = A[idx+b[t].second]; ///BUG!!
                     Aj[nonzero] = b[t].first;
                     if (b[t].first == a0) {
                         diagpos[idxAi] = nonzero;  //local
                     }
+                    //cout << "a[t]:" << a[t] << endl;
                     nonzero++;
                     nonzero_num++;
                 }
@@ -171,6 +179,8 @@ double* Matrixminus(double *b, double *Ax, int nx, int ny, int nz) {
     double *R = new double[size];
     for (int idx = 0; idx < size; ++idx) {
         R[idx] = b[idx] - Ax[idx];
+        //cout << "Ax:" << Ax[idx] << endl;
+        //cout << "R:" << R[idx] << endl;
     }
     return R;
 }
@@ -179,6 +189,7 @@ double dotproduct(double *a, double *b, int n) {
     double res_sum = 0.0; 
     for (int i = 0; i < n; ++i) {
         res += a[i] * b[i];
+        //cout << "a:" << a[i] << endl;
     }
     MPI_Barrier(MPI_COMM_WORLD);
     MPI_Allreduce(&res,&res_sum,1,MPI_DOUBLE,MPI_SUM,MPI_COMM_WORLD);
@@ -219,6 +230,9 @@ void preprocess(int *Ai, int *Aj, double *value, int *diagpos, double *R, double
         int end = diagpos[i]; //Ai[i+1];
         double tmp = 0.0;
         for (int j = begin; j < end; ++j) {
+            //int xidx = Aj[j] / (ny*nz);
+            //int yidx = (Aj[j] % (ny*nz)) / nz;
+            //if (xidx<xs || xidx>=xe || yidx<ys || yidx>=ye) continue;
             tmp += value[j] * y[Aj[j]];
         }
         y[i] = (R[i]-tmp) / 1.0;
@@ -229,12 +243,16 @@ void preprocess(int *Ai, int *Aj, double *value, int *diagpos, double *R, double
         int end = Ai[i+1];
         double tmp = 0.0;
         for (int j = begin; j < end; ++j) {
+            //int xidx = Aj[j] / (ny*nz);
+            //int yidx = (Aj[j] % (ny*nz)) / nz;
+            //if (xidx<xs || xidx>=xe || yidx<ys || yidx>=ye) continue;
             tmp += value[j] * R_[Aj[j]];
         }
         R_[i] = (y[i]-tmp) / value[diagpos[i]];
     }
 }
 void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int PY) {
+    //cout << nx << " " << ny << " " << nz << " " << size << endl;
     int ysize = (ny) * (nz);
     int xsize = (nx) * (nz);
     int csize = nz+2;
@@ -308,6 +326,7 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     int tmp = 0;
     for (int y = 1; y < ny+1; ++y) {
         for (int z = 1; z < nz+1; ++z) {
+            //A[AIDX(0, y, z)] = yhalo[0][tmp];
             s_yhalo[0][tmp] = A[AIDX(1, y, z)];
             tmp++;
         }
@@ -315,13 +334,16 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     tmp = 0;
     for (int y = 1; y < ny+1; ++y) {
         for (int z = 1; z < nz+1; ++z) {
+            //A[AIDX(nx+1, y, z)] = yhalo[1][tmp];
             s_yhalo[1][tmp] = A[AIDX(nx, y, z)];
             tmp++;
         }
     }
+    //return;
     tmp = 0;
     for (int x = 1; x < nx+1; ++x) {
         for (int z = 1; z < nz+1; ++z) {
+            //A[AIDX(x, ny+1, z)] = xhalo[0][tmp];
             s_xhalo[0][tmp] = A[AIDX(x, ny, z)];
             tmp++;
         }
@@ -329,12 +351,17 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     tmp = 0;
     for (int x = 1; x < nx+1; ++x) {
         for (int z = 1; z < nz+1; ++z) {
+            //A[AIDX(x, 0, z)] = xhalo[1][tmp];
             s_xhalo[1][tmp] = A[AIDX(x, 1, z)]; 
             tmp++;
         }
     }
     tmp = 0;
     for (int z = 1; z < nz+1; ++z) {
+       // A[AIDX(0,0,z)] = chalo[0][tmp];
+        //A[AIDX(0,ny+1,z)] = chalo[1][tmp];
+        //A[AIDX(nx+1,ny+1,z)] = chalo[2][tmp];
+        //A[AIDX(nx+1,0,z)] = chalo[3][tmp];
         s_chalo[0][tmp] = A[AIDX(1,1,z)];
         s_chalo[1][tmp] = A[AIDX(1,ny,z)];
         s_chalo[2][tmp] = A[AIDX(nx,ny,z)];
@@ -342,15 +369,14 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
         tmp++;
     }
 
-    MPI_Request req;
-    MPI_Isend(s_yhalo[0], ysize, MPI_DOUBLE, dest[1], tag[1], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_yhalo[1], ysize, MPI_DOUBLE, dest[3], tag[3], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_xhalo[0], xsize, MPI_DOUBLE, dest[2], tag[2], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_xhalo[1], xsize, MPI_DOUBLE, dest[4], tag[4], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_chalo[0], csize, MPI_DOUBLE, dest[5], tag[5], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_chalo[1], csize, MPI_DOUBLE, dest[6], tag[6], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_chalo[2], csize, MPI_DOUBLE, dest[7], tag[7], MPI_COMM_WORLD, &req);
-    MPI_Isend(s_chalo[3], csize, MPI_DOUBLE, dest[8], tag[8], MPI_COMM_WORLD, &req);
+    MPI_Send(s_yhalo[0], ysize, MPI_DOUBLE, dest[1], tag[1], MPI_COMM_WORLD);
+    MPI_Send(s_yhalo[1], ysize, MPI_DOUBLE, dest[3], tag[3], MPI_COMM_WORLD);
+    MPI_Send(s_xhalo[0], xsize, MPI_DOUBLE, dest[2], tag[2], MPI_COMM_WORLD);
+    MPI_Send(s_xhalo[1], xsize, MPI_DOUBLE, dest[4], tag[4], MPI_COMM_WORLD);
+    MPI_Send(s_chalo[0], csize, MPI_DOUBLE, dest[5], tag[5], MPI_COMM_WORLD);
+    MPI_Send(s_chalo[1], csize, MPI_DOUBLE, dest[6], tag[6], MPI_COMM_WORLD);
+    MPI_Send(s_chalo[2], csize, MPI_DOUBLE, dest[7], tag[7], MPI_COMM_WORLD);
+    MPI_Send(s_chalo[3], csize, MPI_DOUBLE, dest[8], tag[8], MPI_COMM_WORLD);
 
     MPI_Status status;
 #define INV(num) num%10*10 + num/10
@@ -367,6 +393,7 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     for (int y = 1; y < ny+1; ++y) {
         for (int z = 1; z < nz+1; ++z) {
             A[AIDX(0, y, z)] = yhalo[0][tmp];
+            //s_yhalo[0][tmp] = A[AIDX(1, y, z)];
             tmp++;
         }
     }
@@ -374,13 +401,16 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     for (int y = 1; y < ny+1; ++y) {
         for (int z = 1; z < nz+1; ++z) {
             A[AIDX(nx+1, y, z)] = yhalo[1][tmp];
+            //s_yhalo[1][tmp] = A[AIDX(nx, y, z)];
             tmp++;
         }
     }
+    //return;
     tmp = 0;
     for (int x = 1; x < nx+1; ++x) {
         for (int z = 1; z < nz+1; ++z) {
             A[AIDX(x, ny+1, z)] = xhalo[0][tmp];
+            //s_xhalo[0][tmp] = A[AIDX(x, ny, z)];
             tmp++;
         }
     }
@@ -388,6 +418,7 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
     for (int x = 1; x < nx+1; ++x) {
         for (int z = 1; z < nz+1; ++z) {
             A[AIDX(x, 0, z)] = xhalo[1][tmp];
+            //s_xhalo[1][tmp] = A[AIDX(x, 1, z)]; 
             tmp++;
         }
     }
@@ -397,6 +428,10 @@ void communicate(double *A, int nx, int ny, int nz, int px, int py, int PX, int 
         A[AIDX(0,ny+1,z)] = chalo[1][tmp];
         A[AIDX(nx+1,ny+1,z)] = chalo[2][tmp];
         A[AIDX(nx+1,0,z)] = chalo[3][tmp];
+        //s_chalo[0][tmp] = A[AIDX(1,1,z)];
+        //s_chalo[1][tmp] = A[AIDX(1,ny,z)];
+        //s_chalo[2][tmp] = A[AIDX(nx,ny,z)];
+        //s_chalo[3][tmp] = A[AIDX(nx,1,z)];
         tmp++;
     }
 }
@@ -417,13 +452,18 @@ void spmv(double *A, double *x, double *Ax, int nx, int ny, int nz, int px, int 
             }
         }
     }
+    //for (int i = 0; i < nx; ++i) {
+    //    int xidx = (i)*(ny+2)*(nz+2) ;//+ (j+1)*(nz+2) + k+1;
+    //    cout << xhalo[xidx] << endl;
+    //}
     communicate(xhalo, nx, ny, nz, px, py, PX, PY);
-    Aproduct(A, xhalo,Ax, nx, ny, nz);
+    Ax = Aproduct(A, xhalo, nx, ny, nz);
 }
 double check_sum(double *value, int nonzero) {
     double sum = 0.0;
     double res_sum = 0.0;
     for (int i = 0; i < nonzero; ++i) {
+        //cout << value[i] << endl;
         sum += value[i];
     }
     MPI_Barrier(MPI_COMM_WORLD);
@@ -433,10 +473,25 @@ double check_sum(double *value, int nonzero) {
 void gcr(double *x, double *A, double *b, int nx, int ny, int nz, int px, int py, int NX, int NY, int NZ, int PX, int PY) {
     int rank;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); //Get Process ID
+    //sync x
     int size = nx*ny*nz;
+    //int sizex = (nx+2)*(ny+2)*(nz+2);
+    //if (rank == 0) {
+    //    for (int i = 0; i < nx+2; ++i) {
+    //        //cout << x[i*ny*nz] << endl;
+    //    }
+    //}
+    //communicate(x, nx, ny, nz, px, py, PX, PY);
+    //if (rank == 0) {
+    //    for (int i = 0; i < nx+2; ++i) {
+    //        cout << x[i*(ny+2)*(nz+2)] << endl;
+    //    }
+    //}
 
     double *Ax = new double[size];
     spmv(A, x, Ax, nx, ny, nz, px, py, PX, PY); //Aproduct(A, x, nx, ny, nz);
+    return;
+    //return;
     double *R = Matrixminus(b, Ax, nx, ny, nz);
     double Rnorm2 = dotproduct(R, R, size);
     if (rank == 0) 
@@ -448,6 +503,7 @@ void gcr(double *x, double *A, double *b, int nx, int ny, int nz, int px, int py
     Ai[0] = 0;
     int *Aj = new int[size*19+1];
     double *value = new double[size*19+1];
+    //cout << 1 << endl;
     int *diagpos = new int[size];
     //TODO
     int xs = px*NX/PX;
@@ -457,18 +513,29 @@ void gcr(double *x, double *A, double *b, int nx, int ny, int nz, int px, int py
     int xe = xs+nx;
     int ys = py*NY/PY + (py<(NY%PY)?py:(NY%PY));
     int ye = ys+ny;
-    int nonzero = getcsrA(A, Ai, Aj, value, diagpos, nx, ny, nz, xs, xe, ys, ye, NX, NY, NZ);
+    //for (int i = 0; i < size*19; ++i) {
+    //    cout << A[i] << endl;
+    //}
+    //int nonzero = getcsrA(A, Ai, Aj, value, diagpos, nx, ny, nz, xs, xe, ys, ye, NX, NY, NZ);
+    //cout << 2 << endl;
     //ILU
-    for (int i = 0; i < size; ++i) {
+    /*for (int i = 0; i < size; ++i) {
         int begin = Ai[i];
         int end = Ai[i+1];
         for (int j = begin; j < diagpos[i]; ++j) {
             //TODO: judge, in ns~ne
+            //int xidx = Aj[j] / (ny*nz);
+            //int yidx = Aj[j] % (ny*nz) / nz;
+            //if (xidx<xs || xidx>=xe || yidx<ys || yidx>=ye) continue;
             int jj = diagpos[Aj[j]];
+            if (jj >= size || j >= size) continue;
             value[j] /= value[jj];
             int jbegin = j+1;
             int jend = end;
             int kbegin = jj+1;
+            //xidx = (Aj[j]+1) / (ny*nz);
+            //yidx = (Aj[j]+1) % (ny*nz) / nz;
+            //if (xidx<xs || xidx>=xe || yidx<ys || yidx>=ye) continue;
             int kend = Ai[Aj[j]+1];
             int idxj=jbegin, idxk=kbegin;
             while (idxj < jend && idxk < kend) {
@@ -484,33 +551,40 @@ void gcr(double *x, double *A, double *b, int nx, int ny, int nz, int px, int py
                 }
             }
         }
-    }
+    }*/
     //checksum
-    int checksum = check_sum(value,nonzero);
-    if(rank == 0 ){
-        cout<<"check_sum:"<<checksum<<endl;
-    }
     //preprocess
-    preprocess(Ai, Aj, value, diagpos, R, R_, size, nx, ny, nz, xs, xe, ys, ye);
+    //preprocess(Ai, Aj, value, diagpos, R, R_, size, nx, ny, nz, xs, xe, ys, ye);
+    //return;
+    //cout << 4 << endl;
+    for (int i = 0; i < size; ++i) {
+        R_[i] = R[i];
+        p0[i] = R_[i]; //p = R_
+    }
     vector<double*> vecAp;
     vector<double*> vecp;
+    //TODO:少一次通信 
     //communicate(p0, nx, ny, nz, px, py, PX, PY);
     //double *Ap0 = Aproduct(A, p0, nx, ny, nz);
     double *Ap0 = new double[size];
-    spmv(A, R_, Ap0, nx, ny, nz, px, py, PX, PY); //Aproduct(A, x, nx, ny, nz);
-    vecp.push_back(R_);
+    spmv(A, p0, Ap0, nx, ny, nz, px, py, PX, PY); //Aproduct(A, x, nx, ny, nz);
+    vecp.push_back(p0);
     vecAp.push_back(Ap0);
     int k = 5;
     double vecAp_2[150];
-    for (int i = 1; i < 29; ++i) {
+    for (int i = 1; i < 150; ++i) {
         vecAp_2[i-1] = dotproduct(vecAp[i-1], vecAp[i-1], size);
         double alpha = dotproduct(R, vecAp[i-1], size) / vecAp_2[i-1];
         //cout << i << endl;
         saxpy(x, vecp[i-1], alpha, size);  //x = x + alpha * p;
         saxpy(R, vecAp[i-1], -alpha, size);  //R = R - alpha * Ap;
         double Rnorm2 = dotproduct(R, R, size);
+        //TODO:算一下中间值 
 		//preprocess
         preprocess(Ai, Aj, value, diagpos, R, R_, size, nx, ny, nz, xs, xe, ys, ye);
+        for (int j = 0; j < size; ++j) {
+            R_[j] = R[j];
+        }
         //sync R_
         int jbegin = int((i-1)/k)*k;
         double *beta = new double[i-jbegin];
@@ -529,18 +603,25 @@ void gcr(double *x, double *A, double *b, int nx, int ny, int nz, int px, int py
         if (rank == 0)
             cout << "Rnorm2=" << Rnorm2 << endl; //1e-5
     }
+    //communicate(x, nx, ny, nz, px, py, PX, PY);
+    //double *pp = Aproduct(A, x, nx, ny, nz);
+    //double *diff = Matrixminus(pp, b, nx, ny, nz);
+    //double norm2_ = dotproduct(diff, diff, size);
+    //if (rank == 0)
+    //    cout << norm2_ << endl;
 
+    //if(rank == 0){
+    //    double *Ax_last = Aproduct(A, x, nx, ny, nz);
+    //    double *R_last = Matrixminus(b, Ax_last, nx, ny, nz);
+    //    double Rnorm2_last = dotproduct(R_last, R_last, size);
+    //    cout << "Rnorm2_last=" << Rnorm2_last << endl; //1e-5
+    //}
 }
-bool load_data(double *A, double *b, double *x, int NX, int NY, int NZ, int size) {
+bool load_data(double *A, double *b, double *x, int size) {
     FILE *fp, *fpb, *fpx;;
-    string nxstr, nystr, nzstr;
-    stringstream ss1, ss2, ss3;
-    ss1 << NX; ss1 >> nxstr;
-    ss2 << NY; ss2 >> nystr;
-    ss3 << NZ; ss3 >> nzstr;
-    string binfile = "case_"+nxstr+"x"+nystr+"x"+nzstr+"/A.bin";
-    string binfileb = "case_"+nxstr+"x"+nystr+"x"+nzstr+"/b.bin";
-    string binfilex = "case_"+nxstr+"x"+nystr+"x"+nzstr+"/x0.bin";
+    string binfile = "case_360x180x38/A.bin";
+    string binfileb = "case_360x180x38/b.bin";
+    string binfilex = "case_360x180x38/x0.bin";
     if ((fp = fopen(binfile.c_str(), "rb")) == NULL) {
         cout << "cannot open A.bin" << endl;
         return 0;
@@ -571,26 +652,21 @@ bool load_data(double *A, double *b, double *x, int NX, int NY, int NZ, int size
     return 1;
 }
 int main(int argc,char**argv) {
-
-    int NX=720, NY=360, NZ=38;
-    int slice = NY*NZ;
-    int size = NX*NY*NZ;
-    double *A = new double[size*19];
-    double *b = new double[size];
-    double *x = new double[size];
-    timeval ld_t1, ld_t2;
-    gettimeofday(&ld_t1, NULL);
-    if (!load_data(A, b, x, NX, NY, NZ, size)) {
-        cout << "Load Data Failed!" << endl;
-        return 0;
-    }
-    gettimeofday(&ld_t2, NULL);
-    float time_ld = (ld_t2.tv_sec - ld_t1.tv_sec)*1e3 + (ld_t2.tv_usec - ld_t1.tv_usec)*1e-3;
-
     timeval t1, t2;
     gettimeofday(&t1, NULL);
 
-    int PX = 4, PY = 6;
+    int NX=360, NY=180, NZ=38;
+    int slice = NY*NZ;
+    int size = 360*180*38;
+    double *A = new double[size*19];
+    double *b = new double[size];
+    double *x = new double[size];
+    if (!load_data(A, b, x, size)) {
+        cout << "Load Data Failed!" << endl;
+        return 0;
+    }
+
+    int PX = 4, PY = 3;
 
     MPI_Init(&argc, &argv);
     int rank, nprocs;
@@ -598,6 +674,7 @@ int main(int argc,char**argv) {
     gethostname(hostname, 100);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank); //Get Process ID
     MPI_Comm_size(MPI_COMM_WORLD, &nprocs); //Get # of Processes
+    //cout<<"rank number:"<<rank<<endl;
     //parallel
     int px = rank/PY;
     int py = rank%PY;
@@ -606,6 +683,7 @@ int main(int argc,char**argv) {
     int nz_ = NZ;
 
     int size_ = nx_*ny_*nz_;
+    //int sizex = (nx_+2) * (ny_+2) * (nz_+2);
     double *A_ = new double[size_*19];
     double *b_ = new double[size_];
     double *x_ = new double[size_];
@@ -623,6 +701,8 @@ int main(int argc,char**argv) {
     int xe = xs+nx_;
     int ys = py*NY/PY + (py<(NY%PY)?py:(NY%PY));
     int ye = ys+ny_;
+    //    cout << "rank:" << rank << endl;
+    //    cout << xs << " " << xe << " " << ys <<  " " << ye << endl;
 #define local_idx(i1,j1,k1) (((i1)*ny_*nz_)+((j1)*nz_)+(k1))
 #define local_idxx(i1,j1,k1) (((i1)*(ny_)*(nz_))+((j1)*(nz_))+(k1))
     for (int i = 0; i < nx_; ++i) {
@@ -633,20 +713,38 @@ int main(int argc,char**argv) {
                     A_[local_idx(i,j,k)*19 + t] = A[global_idx*19 + t];
                 }
                 b_[local_idx(i,j,k)] = b[global_idx];
+                //cout << local_idx(i+1,j+1,k+1) << endl;
                 x_[local_idx(i,j,k)] = x[global_idx];
             }
         }
     }
+   /* for (int i = 1; i < nx_+1; ++i) {
+        for (int j = 1; j < ny_+1; ++j) {
+            for (int k = 1; k < nz_+1; ++k) {
+                int global_idx = (i+xs)*NY*NZ + (j+ys)*NZ + k;
+                x_[(((i)*ny_*nz_)+((j)*nz_)+(k))] = x[global_idx];
+            }
+        }
+    }*/
+   /* if (rank == 0) {
+        for (int i = 0; i < nx_+2; ++i) {
+            cout << x_[(i)*(ny_+2)*(nz_+2)] <<endl;
+        
+        }
+    }
+   */
+    //return 0;
     MPI_Barrier(MPI_COMM_WORLD);
     gcr(x_, A_, b_, nx_, ny_, nz_, px, py, NX, NY, NZ, PX, PY);
     MPI_Barrier(MPI_COMM_WORLD);
 
+    //double *Ax = Aproduct(A, x, NX, NY, NZ);
+    //double *diff = Matrixminus(Ax, b, NX, NY, NZ);
+    //double norm2 = dotproduct(diff, diff, size);
+    //cout << norm2 << endl;
     gettimeofday(&t2, NULL);
-    if (rank == 0) {
-        float time = (t2.tv_sec - t1.tv_sec)*1e3 + (t2.tv_usec-t1.tv_usec)*1e-3;
-        cout << "load data: " << time_ld << "ms" << endl;
-        cout << "gcr: " << time << "ms" << endl;
-    }
+    int time = t2.tv_sec - t1.tv_sec;
+    cout << time << "s" << endl;
 
     MPI_Finalize();
 
