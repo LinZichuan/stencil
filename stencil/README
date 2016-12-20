@@ -1,0 +1,6 @@
+#Baseline
+g++ baseline.cpp -o baseline
+./baseline
+
+#GPU version
+nvcc stencilparallel_last.cu && ./a.out 4 NX NY NZ STEPS

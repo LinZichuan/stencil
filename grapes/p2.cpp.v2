@@ -1,0 +1,482 @@
+#include <iostream>
+#include <stdio.h>
+#include <sys/time.h>
+#include <vector>
+#include <map>
+#include <cstdlib>
+using namespace std;
+
+#define mp(a, b) make_pair<int,int>(a,b)
+#define BACK(idx, N) (idx-1+N)%N
+#define FORW(idx, N) (idx+1)%N
+
+double* Aproduct(double *A, double *x, int nx, int ny, int nz) {
+    int size = nx * ny * nz;
+    int slice = ny * nz;
+    int a[19];
+    double *Ax = new double[size];
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < ny; ++j) {
+            for (int k = 0; k < nz; ++k) {
+                int idx = (i*slice + j*nz + k)*19;
+                int a0 = idx/19;
+                a[0]  = a0; //i*slice + j*nz + k;
+                //i-1,j,k
+                if (i == 0) {
+                    a[1] = a0 + (nx-1)*slice; 
+                } else {
+                    a[1] = a0 - slice;
+                }
+                //i+1,j,k
+                if (i == nx-1) {
+                    a[2] = a0 - (nx-1)*slice;
+                } else {
+                    a[2] = a0 + slice;
+                }
+                //i,j-1,k
+                if (j == 0) {
+                    a[3] = a0 + ((i+nx/2)%nx-i)*slice;
+                } else {
+                    a[3] = a0 - nz;
+                }
+                //i,j+1,k
+                if (j == ny-1) {
+                    a[4] = a0 + ((i+nx/2)%nx-i)*slice;
+                } else {
+                    a[4] = a0 + nz;
+                }
+                //i+1,j+1,k
+                if (i == nx-1) {
+                    if (j == ny-1) {
+                        a[5] = a0 - (nx-1)*slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[5] = a0 - (nx-1)*slice + nz;
+                    }
+                } else {
+                    if (j == ny-1) {
+                        a[5] = a0 + slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[5] = a0 + slice + nz;
+                    }
+                }
+                //i+1,j-1,k
+                if (i == nx-1) {
+                    if (j == 0) {
+                        a[6] = a0 - (nx-1)*slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[6] = a0 - (nx-1)*slice - nz;
+                    }
+                } else {
+                    if (j == 0) {
+                        a[6] = a0 + slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[6] = a0 + slice - nz;
+                    }
+                }
+                //i-1,j-1,k
+                if (i == 0) {
+                    if (j == 0) {
+                        a[7] = a0 + (nx-1)*slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[7] = a0 + (nx-1)*slice - nz;
+                    }
+                } else {
+                    if (j == 0) {
+                        a[7] = a0 - slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[7] = a0 - slice - nz;
+                    }
+                }
+                //i-1,j+1,k
+                if (i == 0) {
+                    if (j == ny-1) {
+                        a[8] = a0 + (nx-1)*slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[8] = a0 + (nx-1)*slice + nz;
+                    }
+                } else {
+                    if (j == ny-1) {
+                        a[8] = a0 - slice + ((i+nx/2)%nx-i)*slice;
+                    } else {
+                        a[8] = a0 - slice + nz;
+                    }
+                }
+                //i,j,k-1
+                a[9]  = a0 - 1;
+                //i-1,j,k-1
+                if (i == 0) {
+                    a[10] = a0 + (nx-1)*slice - 1;
+                } else {
+                    a[10] = a0 - slice - 1;
+                }
+                //i+1,j,k-1
+                if (i == nx-1) {
+                    a[11] = a0 - (nx-1)*slice - 1;
+                } else {
+                    a[11] = a0 + slice - 1;
+                }
+                //i,j-1,k-1
+                if (j == 0) {
+                    a[12] = a0 + ((i+nx/2)%nx-i)*slice - 1;
+                } else {
+                    a[12] = a0 - nz - 1;
+                }
+                //i,j+1,k-1
+                if (j == ny-1) {
+                    a[13] = a0 + ((i+nx/2)%nx-i)*slice - 1;
+                } else {
+                    a[13] = a0 + nz - 1;
+                }
+                //i,j,k+1
+                a[14] = a0 + 1;
+                //i-1,j,k+1
+                if (i == 0) {
+                    a[15] = a0 + (nx-1)*slice + 1;
+                } else {
+                    a[15] = a0 - slice + 1;
+                }
+                //i+1,j,k+1
+                if (i == nx-1) {
+                    a[16] = a0 - (nx-1)*slice + 1;
+                } else {
+                    a[16] = a0 + slice + 1;
+                }
+                //i,j-1,k+1
+                if (j == 0) {
+                    a[17] = a0 + ((i+nx/2)%nx-i)*slice + 1;
+                } else {
+                    a[17] = a0 - nz + 1;
+                }
+                //i,j+1,k+1
+                if (j == ny-1) {
+                    a[18] = a0 + ((i+nx/2)%nx-i)*slice + 1;
+                } else {
+                    a[18] = a0 + nz + 1;
+                }
+                Ax[a0] = A[idx]*x[a0] 
+                        + A[idx+1]*x[a[1]] 
+                        + A[idx+2]*x[a[2]] 
+                        + A[idx+3]*x[a[3]]
+                        + A[idx+4]*x[a[4]]
+                        + A[idx+5]*x[a[5]]
+                        + A[idx+6]*x[a[6]]
+                        + A[idx+7]*x[a[7]]
+                        + A[idx+8]*x[a[8]]
+                        + A[idx+9]*(k==0?0:x[a[9]])
+                        + A[idx+10]*(k==0?0:x[a[10]])
+                        + A[idx+11]*(k==0?0:x[a[11]])
+                        + A[idx+12]*(k==0?0:x[a[12]])
+                        + A[idx+13]*(k==0?0:x[a[13]])
+                        + A[idx+14]*(k==nz-1?0:x[a[14]])
+                        + A[idx+15]*(k==nz-1?0:x[a[15]])
+                        + A[idx+16]*(k==nz-1?0:x[a[16]])
+                        + A[idx+17]*(k==nz-1?0:x[a[17]])
+                        + A[idx+18]*(k==nz-1?0:x[a[18]]);
+            }
+        }
+    }
+    return Ax;
+}
+void getiluA(double *A, map<pair<int,int>, double> &iluA, double *Apos, int nx, int ny, int nz) {
+    int slice = ny*nz;
+    double a[19];
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < ny; ++j) {
+            for (int k = 0; k < nz; ++k) {
+                int idx = (i*slice + j*nz + k)*19;
+#define BACK(idx, N) (idx-1+N)%N
+#define FORW(idx, N) (idx+1)%N
+                a[0]  = i*slice + j*nz + k;
+                //i-1,j,k
+                a[1]  = BACK(i,nx)*slice + j*nz + k;
+                //i+1,j,k
+                a[2]  = FORW(i,nx)*slice + j*nz + k;
+                //i,j-1,k
+                a[3]  = i*slice + (j-1)*nz + k;
+                if (j == 0) a[3] = (i+nx/2)%nx*slice + j*nz + k;
+                //i,j+1,k
+                a[4]  = i*slice + (j+1)*nz + k;
+                if (j == ny-1) a[4] = (i+nx/2)%nx*slice + j*nz + k;
+                //i+1,j+1,k
+                a[5]  = FORW(i,nx)*slice + (j+1)*nz + k;
+                if (j == ny-1) a[5] = (FORW(i,nx)+nx/2)%nx*slice + j*nz + k;
+                //i+1,j-1,k
+                a[6]  = FORW(i,nx)*slice + (j-1)*nz + k;
+                if (j == 0) a[6] = (FORW(i,nx)+nx/2)%nx*slice + j*nz + k;
+                //i-1,j-1,k
+                a[7]  = BACK(i,nx)*slice + (j-1)*nz + k;
+                if (j == 0) a[7] = (BACK(i,nx)+nx/2)%nx*slice + j*nz + k;
+                //i-1,j+1,k
+                a[8]  = BACK(i,nx)*slice + (j+1)*nz + k;
+                if (j == ny-1) a[8] = (BACK(i,nx)+nx/2)%nx*slice + j*nz + k;
+                //i,j,k-1
+                a[9]  = i*slice + j*nz + k-1;
+                //i-1,j,k-1
+                a[10] = BACK(i,nx)*slice + j*nz + k-1;
+                //i+1,j,k-1
+                a[11] = FORW(i,nx)*slice + j*nz + k-1;
+                //i,j-1,k-1
+                a[12] = i*slice + (j-1)*nz + k-1;
+                if (j == 0) a[12] = (i+nx/2)%nx*slice + j*nz + k-1;
+                //i,j+1,k-1
+                a[13] = i*slice + (j+1)*nz + k-1;
+                if (j == ny-1) a[13] = (i+nx/2)%nx*slice + j*nz + k-1;
+                //i,j,k+1
+                a[14] = i*slice + j*nz + k+1;
+                //i-1,j,k+1
+                a[15] = BACK(i,nx)*slice + j*nz + k+1;
+                //i+1,j,k+1
+                a[16] = FORW(i,nx)*slice + j*nz + k+1;
+                //i,j-1,k+1
+                a[17] = i*slice + (j-1)*nz + k+1;
+                if (j == 0) a[17] = (i+nx/2)%nx*slice + j*nz + k+1;
+                //i,j+1,k+1
+                a[18] = i*slice + (j+1)*nz + k+1;
+                if (j == ny-1) a[18] = (i+nx/2)%nx*slice + j*nz + k+1;
+                for (int t = 0; t < 19; ++t) {
+                    if (t>=9 && (k==0 || k==nz-1)) {
+                        Apos[idx+t] = -1;
+                        continue;
+                    }
+                    iluA[mp(a[0], a[t])] = A[idx+t];
+                    Apos[idx+t] = a[t];
+                }
+            }
+        }
+    }
+}
+double* Matrixminus(double *b, double *Ax, int nx, int ny, int nz) {
+    int size = nx * ny * nz;
+    double *R = new double[size];
+    for (int idx = 0; idx < size; ++idx) {
+        R[idx] = b[idx] - Ax[idx];
+    }
+    return R;
+}
+double dotproduct(double *a, double *b, int n) {
+    double res = 0.0;
+    for (int i = 0; i < n; ++i) {
+        res += a[i] * b[i];
+    }
+    return res;
+}
+void saxpy(double *x, double *p, double alpha, int n) {
+    for (int i = 0; i < n; ++i) {
+        x[i] = x[i] + alpha*p[i];
+    }
+}
+double* add(double *a, double *b, int n) {
+    double *res = new double[n];
+    for (int i = 0; i < n; ++i) {
+        res[i] = a[i] + b[i];
+    }
+    return res;
+}
+double* sigma(double *beta, vector<double*> &vec, int jbegin, int i, int size) {
+    double *res = new double[size];
+    for (int t = 0; t < size; ++t) {
+        res[t] = 0.0;
+    }
+    for (int j = jbegin; j < i; ++j) {
+        for (int t = 0; t < size; ++t) {
+            res[t] += beta[j-jbegin] * vec[j][t];
+        }
+    }
+    return res;
+}
+void preprocess(map<pair<int,int>, double> &iluA, double *R, double *R_, double *Apos, int size) {
+    //R=M*R_ , solve R_
+    //diag of L = 1
+    //Ly = R
+    double *y = new double[size];
+    for (int i = 0; i < size; ++i) {
+        //cout << i << endl;
+        double tmp = 0.0;
+        int tmpidx;
+        for (int t = 0; t < 19; ++t) {
+            tmp = t;
+            if (Apos[i*19+t] >= i) break;
+        }
+        for (int jj = 0; jj < tmp; ++jj) {
+            int j = Apos[i*19+jj];
+            tmp += iluA[mp(i,j)] * y[j];
+        }
+        //for (int j = 0; j < i; ++j) {
+        //    tmp += iluA[mp(i,j)] * y[j];
+        //}
+        //y[i] = (R[i]-tmp) / iluA[mp(i,i)];
+        y[i] = (R[i]-tmp);
+    }
+    //UR_ = y
+    for (int i = size-1; i >= 0; --i) {
+        //cout << i << endl;
+        double tmp = 0.0;
+        int tmpidx;
+        for (int t = 0; t < 19; ++t) {
+            tmp = t;
+            if (Apos[i*19+t] > i) break;
+        }
+        for (int jj = tmp; jj < 19; ++jj) {
+            int j = Apos[i*19+jj];
+            tmp += iluA[mp(i,j)] * R_[j];
+        }
+        //for (int j = i+1; j < size; ++j) {
+        //    tmp += iluA[mp(i,j)] * R_[j];
+        //}
+        R_[i] = (y[i]-tmp) / iluA[mp(i,i)];
+    }
+}
+//Ap = add(AR_, sigma(beta, vecAp, jbegin, i));
+int main() {
+    timeval t1, t2;
+    gettimeofday(&t1, NULL);
+    FILE *fp, *fpb, *fpx;;
+    string binfile = "case_360x180x38/A.bin";
+    string binfileb = "case_360x180x38/b.bin";
+    string binfilex = "case_360x180x38/x0.bin";
+    if ((fp = fopen(binfile.c_str(), "rb")) == NULL) {
+        cout << "cannot open A.bin" << endl;
+        return 0;
+    }
+    if ((fpb = fopen(binfileb.c_str(), "rb")) == NULL) {
+        cout << "cannot open b.bin" << endl;
+        return 0;
+    }
+    if ((fpx = fopen(binfilex.c_str(), "rb")) == NULL) {
+        cout << "cannot open x0.bin" << endl;
+        return 0;
+    }
+    int nx=360, ny=180, nz=38;
+    int slice = ny*nz;
+    int size = 360*180*38;
+    double *A = new double[size*19];
+    double *b = new double[size];
+    double *x = new double[size];
+    if (fread(A, sizeof(double), size*19, fp) != size*19) {
+        cout << "file A.bin read error" << endl;
+        return 0;
+    }
+    if (fread(b, sizeof(double), size, fpb) != size) {
+        cout << "file b.bin read error" << endl;
+        return 0;
+    }
+    if (fread(x, sizeof(double), size, fpx) != size) {
+        cout << "file x0.bin read error" << endl;
+        return 0;
+    }
+    //cout.precision(27);
+    //for (int i = 0; i < size; ++i) {
+    //    cout << A[i] << endl;
+    //    cout << b[i] << endl;
+    //    cout << x[i] << endl;
+    //    break;
+    //}
+    fclose(fp);
+    fclose(fpb);
+    fclose(fpx);
+
+    //double *Ax = new double[size];
+    //double *R = new double[size];
+    double *Ax = Aproduct(A, x, nx, ny, nz);
+    double *R = Matrixminus(b, Ax, nx, ny, nz);
+    double Rnorm2 = dotproduct(R, R, size);
+    cout << Rnorm2 << endl; //1e-5
+    double *R_ = new double[size];
+    //double *Ap = new double[size];
+    double *p0 = new double[size];
+    
+    //ILU
+    //map<pair<int,int>, double> iluA;
+    //cout << 1 << endl;
+    //double *Apos = new double[size*19];
+    //getiluA(A, iluA, Apos, nx, ny, nz);
+    //cout << 2 << endl;
+    //for (int i = 0; i < size; ++i) {
+    //    /*
+    //    map<pair<int,int>, double>::iterator it = iluA.begin();
+    //    map<pair<int,int>, double>::iterator tmp, itj, itk;
+    //    for (; it != iluA.end(); ++it) {
+    //        tmp = it;
+    //        if (it->first >= i) break;
+    //    }
+    //    for (itj = iluA.begin(); itj != tmp; ++itj) {
+    //        int j = itj - iluA.begin();
+    //        iluA[mp(i,j)] = iluA[mp(i,j)] / iluA[mp(j,j)];
+    //        for (itk = tmp; itk != iluA.end(); ++itk) {
+    //            int k = itk - tmp;
+    //            iluA[mp(i,k)] = iluA[mp(i,k)] - iluA[mp(i,j)] * iluA[mp(j,k)];
+    //        }
+    //    }*/
+    //    int tmp;
+    //    for (int t = 0; t < 19; ++t) {
+    //        tmp = t;
+    //        if (Apos[i*19+t] >= i) break;
+    //    }
+    //    //cout << i << endl;
+    //    for (int jj = 0; jj < tmp; ++jj) {
+    //        int j = Apos[i*19+jj];
+    //        if (j == -1) continue;
+    //        iluA[mp(i,j)] = iluA[mp(i,j)] / iluA[mp(j,j)];
+    //        for (int kk = jj+1; kk < 19; ++kk) {
+    //            int k = Apos[i*19+kk];
+    //            if (k == -1) continue;
+    //            iluA[mp(i,k)] = iluA[mp(i,k)] - iluA[mp(i,j)] * iluA[mp(j,k)];
+    //        }
+    //    }
+    //    //cout << i << endl;
+    //    //for (int j = 0; j < i; ++j) {
+    //    //    iluA[mp(i,j)] = iluA[mp(i,j)] / iluA[mp(j,j)];
+    //    //    for (int k = j+1; k < size; ++k) {
+    //    //        iluA[mp(i,k)] = iluA[mp(i,k)] - iluA[mp(i,j)] * iluA[mp(j,k)];
+    //    //    }
+    //    //}
+    //}
+    //cout << 3 << endl;
+    ////preprocess
+    //preprocess(iluA, R, R_, Apos, size);
+    //cout << 4 << endl;
+    for (int i = 0; i < size; ++i) {
+        R_[i] = R[i]; //R_ = M^-1 * R //TODO
+        p0[i] = R_[i]; //p = R_
+    }
+    vector<double*> vecAp;
+    vector<double*> vecp;
+    double *Ap0 = Aproduct(A, p0, nx, ny, nz);
+    vecp.push_back(p0);
+    vecAp.push_back(Ap0);
+    int k = 5;
+    double vecAp_2[150];
+    for (int i = 1; i < 134; ++i) {
+        vecAp_2[i-1] = dotproduct(vecAp[i-1], vecAp[i-1], size);
+        double alpha = dotproduct(R, vecAp[i-1], size) / vecAp_2[i-1];
+        //cout << i << endl;
+        saxpy(x, vecp[i-1], alpha, size);  //x = x + alpha * p;
+        saxpy(R, vecAp[i-1], -alpha, size);  //R = R - alpha * Ap;
+        //TODO R_ = Aproduct(inv(M), R, nx, ny, nz);  //R_ = M^-1 * R;
+        //preprocess(iluA, R, R_, Apos, size);
+        for (int t = 0; t < size; ++t) {
+            R_[t] = R[t]; //R_ = M^-1 * R //TODO
+        }
+        int jbegin = int((i-1)/k)*k;
+        double *beta = new double[i-jbegin];
+        double *AR_ = Aproduct(A, R_, nx, ny, nz);
+        for (int j = jbegin; j < i; ++j) {
+            //beta[j-jbegin] = - dotproduct(AR_, vecAp[j], size) / dotproduct(vecAp[j], vecAp[j], size);
+            beta[j-jbegin] = - dotproduct(AR_, vecAp[j], size) / vecAp_2[j];
+        }
+        double *p = add(R_, sigma(beta, vecp, jbegin, i, size), size);
+        double *Ap = add(AR_, sigma(beta, vecAp, jbegin, i, size), size);
+        vecp.push_back(p);
+        vecAp.push_back(Ap);
+    }
+    Ax = Aproduct(A, x, nx, ny, nz);
+    double *diff = Matrixminus(Ax, b, nx, ny, nz);
+    double norm2 = dotproduct(diff, diff, size);
+    cout << norm2 << endl;
+    gettimeofday(&t2, NULL);
+    int time = t2.tv_sec - t1.tv_sec;
+    cout << time << "s" << endl;
+
+    return 0;
+
+}
